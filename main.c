@@ -26,6 +26,7 @@ bool kfcTextToTex(const char *, SDL_Texture **, SDL_Color, int);
 void kfcRenderChar(const char);
 void kfcRenderTex(SDL_Texture *, int, int);
 static void LogRendererInfo(SDL_RendererInfo rendererInfo);
+void drawEmptyBoard();
 
 static char *fontPath = NULL;
 
@@ -47,8 +48,8 @@ typedef struct Piece {
 //typedef struct ChessBoard {
 	
 
-static SDL_Color white = { 255, 255, 255 };
-static SDL_Color black = { 0, 0, 0 };
+static SDL_Color white = { 255, 255, 255, 0 };
+static SDL_Color black = { 0, 0, 0, 0 };
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
@@ -160,6 +161,7 @@ main (int argc, char *argv[])
 	SDL_RenderClear(ren);
 
 	/* draw inital state of board */
+	drawEmptyBoard();
 //	boardRedraw(b);
 
 	kfcRenderChar('a');
@@ -226,8 +228,8 @@ bool kfcTextToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color,
 		return false;
 	}	
 
-//	surf = TTF_RenderText_Solid(font, msg, color);
-	surf = TTF_RenderUTF8_Solid(font, piece_white_king.representation, color);
+	surf = TTF_RenderUTF8_Blended(font, piece_white_king.representation, color); /* render glyph instead of text? */
+
 	if (surf == NULL) {
 		TTF_CloseFont(font);
 		SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "TTF_RenderText %s", TTF_GetError());
@@ -264,4 +266,28 @@ static void LogRendererInfo(SDL_RendererInfo rendererInfo)
 	    (rendererInfo.flags & SDL_RENDERER_PRESENTVSYNC) != 0, 
 	    (rendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) != 0 ); 
 } 
+
+void 
+drawEmptyBoard() 
+{
+	int row = 0,column = 0,x = 0;
+	SDL_Rect rect, darea;
+
+	/* Get the Size of drawing surface */
+	SDL_RenderGetViewport(ren, &darea);
+
+	for( ; row < 8; row++) {
+	        column = row%2;
+		x = column;
+		for( ; column < 4+(row%2); column++) {
+			SDL_SetRenderDrawColor(ren, 255, 0, 0, 0xFF);
+			rect.w = darea.w/8;
+			rect.h = darea.h/8;
+			rect.x = x * rect.w;
+			rect.y = row * rect.h;
+			x = x + 2;
+			SDL_RenderFillRect(ren, &rect);
+		}
+	}
+}
 
