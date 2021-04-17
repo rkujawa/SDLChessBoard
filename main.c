@@ -17,7 +17,11 @@
 #include <fontconfig/fontconfig.h>
 #endif /* _WITH_FONTCONFIG */
 
+#ifdef __linux__
+#include <linux/limits.h>
+#else
 #include <sys/syslimits.h>
+#endif
 
 #define SCREEN_WIDTH 1440
 #define SCREEN_HEIGHT 900
@@ -134,12 +138,8 @@ main (int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	/*
-	 * XXX: prehaps this could be configurable, it's not that chess is so extremely
-	 * demanding game... we could allow for software renderer here.
-	 */
-	ren = SDL_CreateRenderer(win, -1, 
-	    SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	ren = SDL_CreateRenderer(win, -1,  0
+	    /* SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC*/);
 
 	if (ren == NULL) {
 		SDL_LogCritical(SDL_LOG_CATEGORY_VIDEO, "Unable to create renderer: %s", SDL_GetError());

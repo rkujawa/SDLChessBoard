@@ -1,0 +1,16 @@
+CC=cc
+SDL_LIB = -lSDL2 -lSDL2_ttf -lgc
+SDL_INCLUDE =
+LDFLAGS = $(SDL_LIB)
+
+all: chessboard
+
+chessboard: main.o
+	$(CC) $< $(LDFLAGS) -o $@
+
+main.o: main.c
+	$(CC) -c $(SDL_INCLUDE) $< 
+
+clean:
+	rm *.o && rm chessboard
+
