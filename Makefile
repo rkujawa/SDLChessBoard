@@ -1,6 +1,6 @@
 CC=cc
-SDL_LIB = -L/opt/local/lib -L/opt/X11/lib -lSDL2 -lSDL2_ttf -lgc
-# -lfontconfig
+SDL_LIB = -L/opt/local/lib -lSDL2 -lSDL2_ttf -lgc
+# -L/opt/X11/lib -lfontconfig
 SDL_INCLUDE = -I/opt/local/include/
 #-I/opt/X11/include/
 LDFLAGS = $(SDL_LIB)
