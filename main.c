@@ -26,13 +26,11 @@
 #define SCREEN_WIDTH 1440
 #define SCREEN_HEIGHT 900
 
-bool kfcTextToTex(const char *, SDL_Texture **, SDL_Color, int);
-void kfcRenderChar(const char);
-void kfcRenderTex(SDL_Texture *, int, int);
-static void LogRendererInfo(SDL_RendererInfo rendererInfo);
-void drawEmptyBoard();
+enum Rank { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
+enum File { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
-static char *fontPath = NULL;
+typedef enum Rank Rank;
+typedef enum File File;
 
 typedef bool PieceColor;
 #define PIECE_COLOR_WHITE true
@@ -49,8 +47,17 @@ typedef struct Piece {
 //	king, rook, bishop, queen, knight, and pawn
 } Piece;
 
+
+
 //typedef struct ChessBoard {
-	
+
+bool kfcTextToTex(const char *, SDL_Texture **, SDL_Color, int);
+void chessPieceRender(Piece, Rank, File);
+void kfcRenderTex(SDL_Texture *, int, int);
+static void LogRendererInfo(SDL_RendererInfo rendererInfo);
+void drawEmptyBoard();
+
+
 
 static SDL_Color white = { 255, 255, 255, 0 };
 static SDL_Color black = { 0, 0, 0, 0 };
@@ -58,8 +65,10 @@ static SDL_Color black = { 0, 0, 0, 0 };
 static SDL_Window *win;
 static SDL_Renderer *ren;
 
+static char *fontPath = NULL;
 
-const Piece piece_white_king = {
+
+const Piece pieceWhiteKing = {
 	"White King", "♔", PIECE_COLOR_WHITE
 };
 	
@@ -164,7 +173,7 @@ main (int argc, char *argv[])
 	drawEmptyBoard();
 //	boardRedraw(b);
 
-	kfcRenderChar('a');
+	chessPieceRender(pieceWhiteKing, 1, 2);
 	SDL_RenderPresent(ren);
 
 
@@ -197,16 +206,12 @@ main (int argc, char *argv[])
 	return 0;
 }
 
-void kfcRenderChar(const char c)
+void chessPieceRender(Piece pc, Rank r, File f)
 {
 	static SDL_Texture *txttex;
 	int iW, iH, x, y;
 
-	char charBuf[2];
-	charBuf[0] = c;	
-	charBuf[1] = '\0';
-
-	if (!kfcTextToTex(charBuf, &txttex, white, 300))
+	if (!kfcTextToTex(pc.representation, &txttex, white, 300))
 		printf("kfcTextToTex failed\n");
 
 	SDL_QueryTexture(txttex, NULL, NULL, &iW, &iH);
@@ -228,7 +233,7 @@ bool kfcTextToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color,
 		return false;
 	}	
 
-	surf = TTF_RenderUTF8_Blended(font, piece_white_king.representation, color); /* render glyph instead of text? */
+	surf = TTF_RenderUTF8_Blended(font, msg, color); /* render glyph instead of text? */
 
 	if (surf == NULL) {
 		TTF_CloseFont(font);
@@ -277,7 +282,7 @@ drawEmptyBoard()
 	SDL_RenderGetViewport(ren, &darea);
 
 	for( ; row < 8; row++) {
-	        column = row%2;
+		column = row%2;
 		x = column;
 		for( ; column < 4+(row%2); column++) {
 			SDL_SetRenderDrawColor(ren, 255, 0, 0, 0xFF);
