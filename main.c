@@ -23,8 +23,8 @@
 #include <sys/syslimits.h>
 #endif
 
-#define SCREEN_WIDTH 1440
-#define SCREEN_HEIGHT 900
+#define SCREEN_WIDTH 1000
+#define SCREEN_HEIGHT 800
 
 enum Rank { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 enum File { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
@@ -49,19 +49,23 @@ typedef struct Piece {
 
 typedef struct Board {
 
-	SDL_Rect area;
+	SDL_Rect area;			/* board dimensions and position on the screen */
+	SDL_Color fgColor;
+	SDL_Color bgColor;
+
+	uint16_t squareLen;		/* length of square cell of the board */
 
 	/* ... pieces */
 } Board;
 
 //typedef struct ChessBoard {
 
-bool kfcTextToTex(const char *, SDL_Texture **, SDL_Color, int);
-void chessPieceRender(Piece, Rank, File);
-void kfcRenderTex(SDL_Texture *, int, int);
+bool chessPieceToTex(const char *, SDL_Texture **, SDL_Color, int);
+void chessPieceRender(Board *, Piece, Rank, File);
+void renderTex(SDL_Texture *, int, int);
 static void LogRendererInfo(SDL_RendererInfo rendererInfo);
 void drawEmptyBoard(Board *b);
-void setupBoardDimensions(Board *b);
+void setupBoardGraphics(Board *b);
 
 
 
@@ -124,7 +128,7 @@ getDefaultFont()
 
 	return fontPathFinal;
 #else
-	return "chess_merida_unicode.ttf"; /* expect found to be found in current directory */
+	return "chess_merida_unicode.ttf"; /* expected to be found in current directory */
 #endif /* _WITH_FONTCONFIG */
 }
 
@@ -176,12 +180,12 @@ main (int argc, char *argv[])
 	SDL_RenderClear(ren);
 
 	Board b;
-	setupBoardDimensions(&b);
+	setupBoardGraphics(&b);
 	/* draw inital state of board */
 	drawEmptyBoard(&b);
 //	boardRedraw(b);
 
-	chessPieceRender(pieceWhiteKing, 1, 2);
+	chessPieceRender(&b, pieceWhiteKing, 1, 2);
 	SDL_RenderPresent(ren);
 
 
@@ -214,22 +218,25 @@ main (int argc, char *argv[])
 	return 0;
 }
 
-void chessPieceRender(Piece pc, Rank r, File f)
+void chessPieceRender(Board *b, Piece pc, Rank r, File f)
 {
 	static SDL_Texture *txttex;
 	int iW, iH, x, y;
 
-	if (!kfcTextToTex(pc.representation, &txttex, white, 300))
-		printf("kfcTextToTex failed\n");
+	if (!chessPieceToTex(pc.representation, &txttex, white, b->squareLen)) {
+		SDL_LogCritical(SDL_LOG_CATEGORY_VIDEO, "chessPieceToTex failed\n");
+	}
 
 	SDL_QueryTexture(txttex, NULL, NULL, &iW, &iH);
-	x = SCREEN_WIDTH / 2 - iW / 2;
-	y = SCREEN_HEIGHT / 2 - iH / 2;
-	kfcRenderTex(txttex, x, y);
+//	x = SCREEN_WIDTH / 2 - iW / 2;
+//	y = SCREEN_HEIGHT / 2 - iH / 2;
+	x = 0;
+	y = 0;
+	renderTex(txttex, x, y);
 
 }
 
-bool kfcTextToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color, 
+bool chessPieceToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color, 
     int fontsize)
 {
 	SDL_Surface *surf;
@@ -260,7 +267,7 @@ bool kfcTextToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color,
 	return true;
 }
 
-void kfcRenderTex(SDL_Texture *tex, int x, int y)
+void renderTex(SDL_Texture *tex, int x, int y)
 {
 	SDL_Rect dst;
 	dst.x = x;
@@ -281,56 +288,65 @@ static void LogRendererInfo(SDL_RendererInfo rendererInfo)
 } 
 
 void
-setupBoardDimensions(Board *b) 
+setupBoardGraphics(Board *b) 
 {
 	SDL_Rect screenArea;
 
-	uint16_t board_px_len;		/* length of the board in pixels */
-	uint16_t board_x_start;		/* board starts at pixel X of screen */
-	uint16_t board_y_start;		/* board starts at pixel Y of screen */
+	uint16_t boardPxLen;		/* length of the board in pixels */
+
+	SDL_Color bgColor = { 179, 122, 43, 0 };
+	SDL_Color fgColor = { 219, 148, 48, 0 };
+
+	b->bgColor = bgColor;
+	b->fgColor = fgColor;
 
 	/* obtain size of our screen/window */
 	SDL_RenderGetViewport(ren, &screenArea);
 
+	/* assume that board rectangular, so take smaller of screen dimensions */
 	if (screenArea.w < screenArea.h)
-		board_px_len = screenArea.w;
+		boardPxLen = screenArea.w;
 	else
-		board_px_len = screenArea.h;
+		boardPxLen = screenArea.h;
 
-	board_x_start = screenArea.w / 2 - board_px_len / 2;
-	board_y_start = screenArea.h / 2 - board_px_len / 2;
+	/* calculate x, y so that board can be placed on the center of the screen */
+	b->area.x = screenArea.w / 2 - boardPxLen / 2;
+	b->area.y = screenArea.h / 2 - boardPxLen / 2;
 
-	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "x %d y %d w %d h %d board_len %d x_start %d y_start %d",
-		screenArea.x, screenArea.y, screenArea.w, screenArea.h, board_px_len, board_x_start, board_y_start);
+	SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO, "setupBoard: x %d y %d w %d h %d board_len %d x_start %d y_start %d",
+		screenArea.x, screenArea.y, screenArea.w, screenArea.h, boardPxLen, b->area.x, b->area.y);
 
-	b->area.x = board_x_start;
-	b->area.y = board_y_start;
-	b->area.w = board_px_len;
-	b->area.h = board_px_len;
+	b->area.w = boardPxLen;
+	b->area.h = boardPxLen;
+
+	b->squareLen = b->area.w/8;	/* again, we assume that w=h */
+
 }
 
+/* inspired by one of the examples distributed with SDL */
 void 
 drawEmptyBoard(Board *b) 
 {
-	int row = 0,column = 0,x = 0;
-	SDL_Rect rect, darea;
+	int row = 0, column = 0, x = 0;
+	SDL_Rect sqRect;
 
-	darea = b->area;
+	/* draw background */
+	SDL_SetRenderDrawColor(ren, b->bgColor.r, b->bgColor.g, b->bgColor.b, b->bgColor.a);
+	SDL_RenderFillRect(ren, &(b->area));
 
-	/* Get the Size of drawing surface */
-//	SDL_RenderGetViewport(ren, &darea);
+	sqRect.w = b->squareLen;
+	sqRect.h = b->squareLen;
 
+	/* draw squares in foreground color */
 	for( ; row < 8; row++) {
 		column = row%2;
 		x = column;
 		for( ; column < 4+(row%2); column++) {
-			SDL_SetRenderDrawColor(ren, 255, 0, 0, 0xFF);
-			rect.w = darea.w/8;
-			rect.h = darea.h/8;
-			rect.x = (x * rect.w) + darea.x;
-			rect.y = (row * rect.h) + darea.y;
-			x = x + 2;
-			SDL_RenderFillRect(ren, &rect);
+			SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
+			sqRect.x = (x * sqRect.w) + b->area.x;
+			sqRect.y = (row * sqRect.h) + b->area.y;
+			x += 2;
+			SDL_RenderFillRect(ren, &sqRect);
 		}
 	}
 }
