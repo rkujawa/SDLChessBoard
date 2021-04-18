@@ -44,7 +44,6 @@ typedef struct Piece {
 	/* move pattern? */
 	/* atack pattern? */
 
-//	king, rook, bishop, queen, knight, and pawn
 } Piece;
 
 typedef struct Board {
@@ -55,10 +54,8 @@ typedef struct Board {
 
 	uint16_t squareLen;		/* length of square cell of the board */
 
-	/* ... pieces */
+	/* ... pieces? */
 } Board;
-
-//typedef struct ChessBoard {
 
 bool chessPieceToTex(const char *, SDL_Texture **, SDL_Color, int);
 void chessPieceRender(Board *, Piece, Rank, File);
@@ -77,13 +74,16 @@ static SDL_Renderer *ren;
 
 static char *fontPath = NULL;
 
-
+//	king, rook, bishop, queen, knight, and pawn
 const Piece pieceWhiteKing = {
 	"White King", "♔", PIECE_COLOR_WHITE
 };
-	
-
-//static chessBoard b;
+const Piece pieceWhiteQueen = {
+	"White Queen", "♕", PIECE_COLOR_WHITE
+};
+const Piece pieceBlackKing = {
+	"Black King", "♚", PIECE_COLOR_BLACK
+};
 
 char *
 getDefaultFont() 
@@ -183,9 +183,11 @@ main (int argc, char *argv[])
 	setupBoardGraphics(&b);
 	/* draw inital state of board */
 	drawEmptyBoard(&b);
-//	boardRedraw(b);
 
-	chessPieceRender(&b, pieceWhiteKing, 1, 2);
+	chessPieceRender(&b, pieceWhiteKing, RANK_8, FILE_A);
+	chessPieceRender(&b, pieceWhiteQueen, RANK_7, FILE_C);
+	chessPieceRender(&b, pieceBlackKing, RANK_1, FILE_G);
+
 	SDL_RenderPresent(ren);
 
 
@@ -223,15 +225,21 @@ void chessPieceRender(Board *b, Piece pc, Rank r, File f)
 	static SDL_Texture *txttex;
 	int iW, iH, x, y;
 
-	if (!chessPieceToTex(pc.representation, &txttex, white, b->squareLen)) {
+	/* could be handled more elegantly if PieceColor was a struct */
+	SDL_Color *pieceColor;
+
+	if (pc.color == PIECE_COLOR_WHITE)
+		pieceColor = &white;
+	else
+		pieceColor = &black;
+
+	if (!chessPieceToTex(pc.representation, &txttex, *pieceColor, b->squareLen)) {
 		SDL_LogCritical(SDL_LOG_CATEGORY_VIDEO, "chessPieceToTex failed\n");
 	}
 
 	SDL_QueryTexture(txttex, NULL, NULL, &iW, &iH);
-//	x = SCREEN_WIDTH / 2 - iW / 2;
-//	y = SCREEN_HEIGHT / 2 - iH / 2;
-	x = 0;
-	y = 0;
+	x = b->area.x + (b->squareLen * r);
+	y = b->area.y + (b->squareLen * f);
 	renderTex(txttex, x, y);
 
 }
