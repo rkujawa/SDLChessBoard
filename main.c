@@ -47,7 +47,12 @@ typedef struct Piece {
 //	king, rook, bishop, queen, knight, and pawn
 } Piece;
 
+typedef struct Board {
 
+	SDL_Rect area;
+
+	/* ... pieces */
+} Board;
 
 //typedef struct ChessBoard {
 
@@ -55,7 +60,8 @@ bool kfcTextToTex(const char *, SDL_Texture **, SDL_Color, int);
 void chessPieceRender(Piece, Rank, File);
 void kfcRenderTex(SDL_Texture *, int, int);
 static void LogRendererInfo(SDL_RendererInfo rendererInfo);
-void drawEmptyBoard();
+void drawEmptyBoard(Board *b);
+void setupBoardDimensions(Board *b);
 
 
 
@@ -169,8 +175,10 @@ main (int argc, char *argv[])
 	SDL_ShowCursor(SDL_DISABLE);
 	SDL_RenderClear(ren);
 
+	Board b;
+	setupBoardDimensions(&b);
 	/* draw inital state of board */
-	drawEmptyBoard();
+	drawEmptyBoard(&b);
 //	boardRedraw(b);
 
 	chessPieceRender(pieceWhiteKing, 1, 2);
@@ -272,14 +280,45 @@ static void LogRendererInfo(SDL_RendererInfo rendererInfo)
 	    (rendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) != 0 ); 
 } 
 
+void
+setupBoardDimensions(Board *b) 
+{
+	SDL_Rect screenArea;
+
+	uint16_t board_px_len;		/* length of the board in pixels */
+	uint16_t board_x_start;		/* board starts at pixel X of screen */
+	uint16_t board_y_start;		/* board starts at pixel Y of screen */
+
+	/* obtain size of our screen/window */
+	SDL_RenderGetViewport(ren, &screenArea);
+
+	if (screenArea.w < screenArea.h)
+		board_px_len = screenArea.w;
+	else
+		board_px_len = screenArea.h;
+
+	board_x_start = screenArea.w / 2 - board_px_len / 2;
+	board_y_start = screenArea.h / 2 - board_px_len / 2;
+
+	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "x %d y %d w %d h %d board_len %d x_start %d y_start %d",
+		screenArea.x, screenArea.y, screenArea.w, screenArea.h, board_px_len, board_x_start, board_y_start);
+
+	b->area.x = board_x_start;
+	b->area.y = board_y_start;
+	b->area.w = board_px_len;
+	b->area.h = board_px_len;
+}
+
 void 
-drawEmptyBoard() 
+drawEmptyBoard(Board *b) 
 {
 	int row = 0,column = 0,x = 0;
 	SDL_Rect rect, darea;
 
+	darea = b->area;
+
 	/* Get the Size of drawing surface */
-	SDL_RenderGetViewport(ren, &darea);
+//	SDL_RenderGetViewport(ren, &darea);
 
 	for( ; row < 8; row++) {
 		column = row%2;
@@ -288,8 +327,8 @@ drawEmptyBoard()
 			SDL_SetRenderDrawColor(ren, 255, 0, 0, 0xFF);
 			rect.w = darea.w/8;
 			rect.h = darea.h/8;
-			rect.x = x * rect.w;
-			rect.y = row * rect.h;
+			rect.x = (x * rect.w) + darea.x;
+			rect.y = (row * rect.h) + darea.y;
 			x = x + 2;
 			SDL_RenderFillRect(ren, &rect);
 		}
