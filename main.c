@@ -26,6 +26,8 @@
 #define SCREEN_WIDTH 1000
 #define SCREEN_HEIGHT 800
 
+#define CHESSBOARD_SQUARES 64
+
 enum Rank { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 enum File { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
@@ -54,16 +56,19 @@ typedef struct Board {
 
 	uint16_t squareLen;		/* length of square cell of the board */
 
-	/* ... pieces? */
+	bool flipped;			/* is board view flipped? */
+
+	const Piece **pos;			/* array of pieces on the board */
 } Board;
 
 bool chessPieceToTex(const char *, SDL_Texture **, SDL_Color, int);
 void chessPieceRender(Board *, Piece, Rank, File);
 void renderTex(SDL_Texture *, int, int);
 static void LogRendererInfo(SDL_RendererInfo rendererInfo);
-void drawEmptyBoard(Board *b);
-void setupBoardGraphics(Board *b);
-
+void boardRedrawEmpty(Board *);
+void boardRedraw(Board *);
+void boardSetupGraphics(Board *);
+bool boardInit(Board *);
 
 
 static SDL_Color white = { 255, 255, 255, 0 };
@@ -74,15 +79,42 @@ static SDL_Renderer *ren;
 
 static char *fontPath = NULL;
 
-//	king, rook, bishop, queen, knight, and pawn
 const Piece pieceWhiteKing = {
 	"White King", "♔", PIECE_COLOR_WHITE
 };
 const Piece pieceWhiteQueen = {
 	"White Queen", "♕", PIECE_COLOR_WHITE
 };
+const Piece pieceWhiteRook = {
+	"White Rook", "♖", PIECE_COLOR_WHITE
+};
+const Piece pieceWhiteBishop = {
+	"White Bishop", "♗", PIECE_COLOR_WHITE
+};
+const Piece pieceWhiteKnight = {
+	"White Knight", "♘", PIECE_COLOR_WHITE
+};
+const Piece pieceWhitePawn = {
+	"White Pawn", "♙", PIECE_COLOR_WHITE
+};
+
 const Piece pieceBlackKing = {
 	"Black King", "♚", PIECE_COLOR_BLACK
+};
+const Piece pieceBlackQueen = {
+	"Black Queen", "♛", PIECE_COLOR_BLACK
+};
+const Piece pieceBlackRook = {
+	"Black Rook", "♜", PIECE_COLOR_BLACK
+};
+const Piece pieceBlackBishop = {
+	"Black Bishop", "♝", PIECE_COLOR_BLACK
+};
+const Piece pieceBlackKnight = {
+	"Black Knight", "♞", PIECE_COLOR_BLACK
+};
+const Piece pieceBlackPawn = {
+	"Black Pawn", "♟️", PIECE_COLOR_BLACK
 };
 
 char *
@@ -137,6 +169,8 @@ main (int argc, char *argv[])
 {
 	char *c;
 
+	GC_INIT();
+
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		SDL_LogCritical(SDL_LOG_CATEGORY_SYSTEM, "SDL_Init %s", SDL_GetError());
 		return EXIT_FAILURE;
@@ -180,13 +214,10 @@ main (int argc, char *argv[])
 	SDL_RenderClear(ren);
 
 	Board b;
-	setupBoardGraphics(&b);
+	boardInit(&b);
+	boardSetupGraphics(&b);
 	/* draw inital state of board */
-	drawEmptyBoard(&b);
-
-	chessPieceRender(&b, pieceWhiteKing, RANK_8, FILE_A);
-	chessPieceRender(&b, pieceWhiteQueen, RANK_7, FILE_C);
-	chessPieceRender(&b, pieceBlackKing, RANK_1, FILE_G);
+	boardRedraw(&b);
 
 	SDL_RenderPresent(ren);
 
@@ -295,8 +326,28 @@ static void LogRendererInfo(SDL_RendererInfo rendererInfo)
 	    (rendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) != 0 ); 
 } 
 
+bool
+boardInit(Board *b)
+{
+	b->pos = GC_MALLOC(sizeof(const Piece *) * CHESSBOARD_SQUARES);
+	if(b->pos == NULL) {
+		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Could not allocate memory");
+		return false;
+	}
+
+	b->pos[0] = &pieceBlackRook;
+	b->pos[1] = &pieceBlackKnight;
+
+	b->pos[61] = &pieceWhiteBishop;
+	b->pos[62] = &pieceWhiteKnight;
+	b->pos[63] = &pieceWhiteRook;
+
+
+	return true;
+}
+
 void
-setupBoardGraphics(Board *b) 
+boardSetupGraphics(Board *b) 
 {
 	SDL_Rect screenArea;
 
@@ -331,9 +382,27 @@ setupBoardGraphics(Board *b)
 
 }
 
+void
+boardRedraw(Board *b)
+{
+	uint8_t i;
+
+	boardRedrawEmpty(b);
+
+	for (i = 0; i < CHESSBOARD_SQUARES; i++) {
+		if (b->pos[i] != NULL) {
+			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at rank %d file %d", 
+			    b->pos[i]->representation, i%8, i/8);
+			chessPieceRender(b, *(b->pos[i]), i%8, i/8);
+		}
+	}
+
+
+}
+
 /* inspired by one of the examples distributed with SDL */
 void 
-drawEmptyBoard(Board *b) 
+boardRedrawEmpty(Board *b) 
 {
 	int row = 0, column = 0, x = 0;
 	SDL_Rect sqRect;
