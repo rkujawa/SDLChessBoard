@@ -71,6 +71,8 @@ void boardSetupGraphics(Board *);
 bool boardInit(Board *);
 void boardSquareRedraw(Board *, Rank, File);
 
+static inline char rankToChar(Rank);
+static inline char fileToChar(File);
 
 static SDL_Color white = { 255, 255, 255, 0 };
 static SDL_Color black = { 0, 0, 0, 0 };
@@ -217,8 +219,12 @@ main (int argc, char *argv[])
 	boardSetupGraphics(&b);
 	/* draw inital state of board */
 	boardRedraw(&b);
-
-//	boardSquareRedraw(&b, RANK_1, FILE_A);
+						/* 0,	  0	*/
+	boardSquareRedraw(&b, RANK_8, FILE_A);
+						/* 7,	  0 */
+	boardSquareRedraw(&b, RANK_1, FILE_A);
+	boardSquareRedraw(&b, RANK_1, FILE_F);
+	boardSquareRedraw(&b, RANK_4, FILE_C);
 
 	SDL_RenderPresent(ren);
 
@@ -260,6 +266,9 @@ void chessPieceRender(Board *b, Piece pc, Rank r, File f)
 	/* could be handled more elegantly if PieceColor was a struct */
 	SDL_Color *pieceColor;
 
+	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at r %d f %d %c%c", 
+	    pc.name, r, f, rankToChar(r), fileToChar(f));
+
 	if (pc.color == PIECE_COLOR_WHITE)
 		pieceColor = &white;
 	else
@@ -270,8 +279,8 @@ void chessPieceRender(Board *b, Piece pc, Rank r, File f)
 	}
 
 	SDL_QueryTexture(txttex, NULL, NULL, &iW, &iH);
-	x = b->area.x + (b->squareLen * r);
-	y = b->area.y + (b->squareLen * f);
+	x = b->area.x + (b->squareLen * f);
+	y = b->area.y + (b->squareLen * r);
 	renderTex(txttex, x, y);
 
 }
@@ -336,25 +345,25 @@ pieceRankFileToBoardPos(Rank r, File f)
 static inline Rank
 pieceBoardPosToRank(uint8_t bp)
 {
-	return bp%8;
+	return bp/8;
 }
 
 static inline File
 pieceBoardPosToFile(uint8_t bp)
 {
-	return bp/8;
+	return bp%8;
 }
 
 static inline char
 rankToChar(Rank r)
 {
-	return 'a'+r;
+	return '0'+(8-r);
 }
 
 static inline char
 fileToChar(File f)
 {
-	return '8'-f;
+	return 'a'+f;
 }
 
 static void
@@ -380,8 +389,9 @@ boardInit(Board *b)
 		return false;
 	}
 
+											/* raw values: rank 0, file 0 (array 0) */
 	piecePlaceOnBoard(b, &pieceBlackRook, RANK_8, FILE_A);
-	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_B);
+	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_B); 
 	piecePlaceOnBoard(b, &pieceBlackBishop, RANK_8, FILE_C);
 	piecePlaceOnBoard(b, &pieceBlackQueen, RANK_8, FILE_D);
 	piecePlaceOnBoard(b, &pieceBlackKing, RANK_8, FILE_E);
@@ -391,6 +401,7 @@ boardInit(Board *b)
 
 	for (i = 0; i < 8; i++)
 		piecePlaceOnBoard(b, &pieceBlackPawn, RANK_7, FILE_A+i);
+
 
 	piecePlaceOnBoard(b, &pieceWhiteRook, RANK_1, FILE_A);
 	piecePlaceOnBoard(b, &pieceWhiteKnight, RANK_1, FILE_B);
@@ -461,15 +472,11 @@ boardRedraw(Board *b)
 			r = pieceBoardPosToRank(i);
 			f = pieceBoardPosToFile(i);
 
-			SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at %c%c", 
-			    b->pos[i]->name, rankToChar(r), fileToChar(f));
-
 			chessPieceRender(b, *(b->pos[i]), r, f);
 		}
 	}
 }
 
-/* XXX: FIXME */
 void
 boardSquareRedraw(Board *b, Rank r, File f)
 {
@@ -479,22 +486,28 @@ boardSquareRedraw(Board *b, Rank r, File f)
 
 	bIdx = pieceRankFileToBoardPos(r, f);
 
-	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Redrawing square %s at r %d f %d (%c%c) (bIdx %d)", 
-	    b->pos[bIdx]->name, r, f, rankToChar(r), fileToChar(f), bIdx);
 
 	if (bIdx%2)
-		SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
-	else
 		SDL_SetRenderDrawColor(ren, b->bgColor.r, b->bgColor.g, b->bgColor.b, b->bgColor.a);
+	else
+		SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
+
 
 	sqRect.w = b->squareLen;
 	sqRect.h = b->squareLen;
-	sqRect.x = ((8-r) * sqRect.w) + b->area.x;
-	sqRect.y = (f * sqRect.h) + b->area.y;
-
-	chessPieceRender(b, *(b->pos[bIdx]), r, f);
+	sqRect.x = (f * sqRect.w) + b->area.x;
+	sqRect.y = (r * sqRect.h) + b->area.y;
 
 	SDL_RenderFillRect(ren, &sqRect);
+
+	if (b->pos[bIdx] != NULL) {
+		chessPieceRender(b, *(b->pos[bIdx]), r, f);
+		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Redrawing square %s at r %d f %d (%c%c) (bIdx %d)", 
+	        b->pos[bIdx]->name, r, f, rankToChar(r), fileToChar(f), bIdx);
+	} else
+		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Redrawing empty square at r %d f %d (%c%c) (bIdx %d)", 
+	        r, f, rankToChar(r), fileToChar(f), bIdx);
+
 }
 
 /* inspired by one of the examples distributed with SDL */
