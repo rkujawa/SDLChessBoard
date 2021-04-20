@@ -69,6 +69,7 @@ void boardRedrawEmpty(Board *);
 void boardRedraw(Board *);
 void boardSetupGraphics(Board *);
 bool boardInit(Board *);
+void boardSquareRedraw(Board *, Rank, File);
 
 
 static SDL_Color white = { 255, 255, 255, 0 };
@@ -80,22 +81,22 @@ static SDL_Renderer *ren;
 static char *fontPath = NULL;
 
 const Piece pieceWhiteKing = {
-	"White King", "♔", PIECE_COLOR_WHITE
+	"White King", "♚"/*"♔"*/, PIECE_COLOR_WHITE
 };
 const Piece pieceWhiteQueen = {
-	"White Queen", "♕", PIECE_COLOR_WHITE
+	"White Queen", "♛"/*"♕"*/, PIECE_COLOR_WHITE
 };
 const Piece pieceWhiteRook = {
-	"White Rook", "♖", PIECE_COLOR_WHITE
+	"White Rook", "♜"/*"♖"*/, PIECE_COLOR_WHITE
 };
 const Piece pieceWhiteBishop = {
-	"White Bishop", "♗", PIECE_COLOR_WHITE
+	"White Bishop", "♝"/*"♗"*/, PIECE_COLOR_WHITE
 };
 const Piece pieceWhiteKnight = {
-	"White Knight", "♘", PIECE_COLOR_WHITE
+	"White Knight", "♞"/*"♘"*/, PIECE_COLOR_WHITE
 };
 const Piece pieceWhitePawn = {
-	"White Pawn", "♙", PIECE_COLOR_WHITE
+	"White Pawn", "♟️"/*"♙"*/, PIECE_COLOR_WHITE
 };
 
 const Piece pieceBlackKing = {
@@ -167,8 +168,6 @@ getDefaultFont()
 int
 main (int argc, char *argv[]) 
 {
-	char *c;
-
 	GC_INIT();
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -218,6 +217,8 @@ main (int argc, char *argv[])
 	boardSetupGraphics(&b);
 	/* draw inital state of board */
 	boardRedraw(&b);
+
+//	boardSquareRedraw(&b, RANK_1, FILE_A);
 
 	SDL_RenderPresent(ren);
 
@@ -326,22 +327,82 @@ static void LogRendererInfo(SDL_RendererInfo rendererInfo)
 	    (rendererInfo.flags & SDL_RENDERER_TARGETTEXTURE) != 0 ); 
 } 
 
+static inline uint8_t
+pieceRankFileToBoardPos(Rank r, File f)
+{
+	return r*8 + f;
+}
+
+static inline Rank
+pieceBoardPosToRank(uint8_t bp)
+{
+	return bp%8;
+}
+
+static inline File
+pieceBoardPosToFile(uint8_t bp)
+{
+	return bp/8;
+}
+
+static inline char
+rankToChar(Rank r)
+{
+	return 'a'+r;
+}
+
+static inline char
+fileToChar(File f)
+{
+	return '8'-f;
+}
+
+static void
+piecePlaceOnBoard(Board *b, const Piece *p, Rank r, File f)
+{
+	uint8_t bIdx;
+	bIdx = pieceRankFileToBoardPos(r,f);
+
+	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Placing piece %s r %d f %d at board array idx %d",
+		p->name, r, f, bIdx);
+
+	b->pos[bIdx] = p;
+}
+
 bool
 boardInit(Board *b)
 {
+	uint8_t i;
+
 	b->pos = GC_MALLOC(sizeof(const Piece *) * CHESSBOARD_SQUARES);
 	if(b->pos == NULL) {
 		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Could not allocate memory");
 		return false;
 	}
 
-	b->pos[0] = &pieceBlackRook;
-	b->pos[1] = &pieceBlackKnight;
+	piecePlaceOnBoard(b, &pieceBlackRook, RANK_8, FILE_A);
+	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_B);
+	piecePlaceOnBoard(b, &pieceBlackBishop, RANK_8, FILE_C);
+	piecePlaceOnBoard(b, &pieceBlackQueen, RANK_8, FILE_D);
+	piecePlaceOnBoard(b, &pieceBlackKing, RANK_8, FILE_E);
+	piecePlaceOnBoard(b, &pieceBlackBishop, RANK_8, FILE_F);
+	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_G);
+	piecePlaceOnBoard(b, &pieceBlackRook, RANK_8, FILE_H);
 
-	b->pos[61] = &pieceWhiteBishop;
-	b->pos[62] = &pieceWhiteKnight;
-	b->pos[63] = &pieceWhiteRook;
+	for (i = 0; i < 8; i++)
+		piecePlaceOnBoard(b, &pieceBlackPawn, RANK_7, FILE_A+i);
 
+	piecePlaceOnBoard(b, &pieceWhiteRook, RANK_1, FILE_A);
+	piecePlaceOnBoard(b, &pieceWhiteKnight, RANK_1, FILE_B);
+	piecePlaceOnBoard(b, &pieceWhiteBishop, RANK_1, FILE_C);
+	piecePlaceOnBoard(b, &pieceWhiteQueen, RANK_1, FILE_D);
+	piecePlaceOnBoard(b, &pieceWhiteKing, RANK_1, FILE_E);
+	piecePlaceOnBoard(b, &pieceWhiteBishop, RANK_1, FILE_F);
+	piecePlaceOnBoard(b, &pieceWhiteKnight, RANK_1, FILE_G);
+	piecePlaceOnBoard(b, &pieceWhiteRook, RANK_1, FILE_H);
+
+	for (i = 0; i < 8; i++)
+		piecePlaceOnBoard(b, &pieceWhitePawn, RANK_2, FILE_A+i);
 
 	return true;
 }
@@ -382,22 +443,58 @@ boardSetupGraphics(Board *b)
 
 }
 
+/**
+ * Draw the board and all pieces that are on the board.
+ */
 void
 boardRedraw(Board *b)
 {
 	uint8_t i;
+	Rank r;
+	File f;
 
 	boardRedrawEmpty(b);
 
+	/* Iterate over all squares of board and draw pieces where appropripate. */
 	for (i = 0; i < CHESSBOARD_SQUARES; i++) {
 		if (b->pos[i] != NULL) {
-			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at rank %d file %d", 
-			    b->pos[i]->representation, i%8, i/8);
-			chessPieceRender(b, *(b->pos[i]), i%8, i/8);
+			r = pieceBoardPosToRank(i);
+			f = pieceBoardPosToFile(i);
+
+			SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at %c%c", 
+			    b->pos[i]->name, rankToChar(r), fileToChar(f));
+
+			chessPieceRender(b, *(b->pos[i]), r, f);
 		}
 	}
+}
 
+/* XXX: FIXME */
+void
+boardSquareRedraw(Board *b, Rank r, File f)
+{
+	SDL_Rect sqRect;
 
+	uint8_t bIdx;
+
+	bIdx = pieceRankFileToBoardPos(r, f);
+
+	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Redrawing square %s at r %d f %d (%c%c) (bIdx %d)", 
+	    b->pos[bIdx]->name, r, f, rankToChar(r), fileToChar(f), bIdx);
+
+	if (bIdx%2)
+		SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
+	else
+		SDL_SetRenderDrawColor(ren, b->bgColor.r, b->bgColor.g, b->bgColor.b, b->bgColor.a);
+
+	sqRect.w = b->squareLen;
+	sqRect.h = b->squareLen;
+	sqRect.x = ((8-r) * sqRect.w) + b->area.x;
+	sqRect.y = (f * sqRect.h) + b->area.y;
+
+	chessPieceRender(b, *(b->pos[bIdx]), r, f);
+
+	SDL_RenderFillRect(ren, &sqRect);
 }
 
 /* inspired by one of the examples distributed with SDL */

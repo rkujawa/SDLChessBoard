@@ -1,4 +1,5 @@
 CC=cc
+CFLAGS=-Wall
 SDL_LIB = -lSDL2 -lSDL2_ttf -lgc
 SDL_INCLUDE =
 LDFLAGS = $(SDL_LIB)
@@ -9,7 +10,7 @@ chessboard: main.o
 	$(CC) $< $(LDFLAGS) -o $@
 
 main.o: main.c
-	$(CC) -c $(SDL_INCLUDE) $< 
+	$(CC) $(CFLAGS) -c $(SDL_INCLUDE) $< 
 
 clean:
 	rm *.o && rm chessboard
