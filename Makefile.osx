@@ -1,10 +1,10 @@
 CC=cc
-CFLAGS=-Wall
-SDL_LIB = -L/opt/local/lib -lSDL2 -lSDL2_ttf -lgc
-# -L/opt/X11/lib -lfontconfig
-SDL_INCLUDE = -I/opt/local/include/
-#-I/opt/X11/include/
-LDFLAGS = $(SDL_LIB)
+
+SDL_CFLAGS = $(shell sdl2-config --cflags)
+SDL_LDFLAGS = $(shell sdl2-config --libs) -lSDL2_ttf 
+
+CFLAGS=-Wall -I/opt/local/include $(SDL_CFLAGS)
+LDFLAGS = -lgc $(SDL_LDFLAGS)
 
 all: chessboard
 
@@ -12,7 +12,7 @@ chessboard: main.o
 	$(CC) $< $(LDFLAGS) -o $@
 
 main.o: main.c
-	$(CC) -c $(CFLAGS) $(SDL_INCLUDE) $< 
+	$(CC) -c $(CFLAGS) $< 
 
 clean:
 	rm *.o && rm chessboard

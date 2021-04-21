@@ -10,8 +10,8 @@
 
 #include <gc/gc.h>
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
 
 #ifdef _WITH_FONTCONFIG
 #include <fontconfig/fontconfig.h>
@@ -30,9 +30,11 @@
 
 enum Rank { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 enum File { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
+enum SquareState { SQUARE_PLAIN, SQUARE_SELECTED, SQUARE_HILIGHTED };	/* TBD */
 
 typedef enum Rank Rank;
 typedef enum File File;
+typedef enum SquareState SquareState;
 
 typedef bool PieceColor;
 #define PIECE_COLOR_WHITE true
@@ -69,13 +71,14 @@ void boardRedrawEmpty(Board *);
 void boardRedraw(Board *);
 void boardSetupGraphics(Board *);
 bool boardInit(Board *);
-void boardSquareRedraw(Board *, Rank, File);
+void boardSquareRedraw(Board *, Rank, File, SquareState s);
 
 static inline char rankToChar(Rank);
 static inline char fileToChar(File);
 
 static SDL_Color white = { 255, 255, 255, 0 };
 static SDL_Color black = { 0, 0, 0, 0 };
+static SDL_Color selectedBg = { 57, 182, 191, 0 };
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
@@ -168,7 +171,7 @@ getDefaultFont()
 }
 
 int
-main (int argc, char *argv[]) 
+main(int argc, char *argv[]) 
 {
 	GC_INIT();
 
@@ -176,6 +179,8 @@ main (int argc, char *argv[])
 		SDL_LogCritical(SDL_LOG_CATEGORY_SYSTEM, "SDL_Init %s", SDL_GetError());
 		return EXIT_FAILURE;
 	}
+
+	SDL_LogSetAllPriority(SDL_LOG_PRIORITY_DEBUG);
 
 	fontPath = getDefaultFont();
 	if (fontPath == NULL) {
@@ -220,11 +225,11 @@ main (int argc, char *argv[])
 	/* draw inital state of board */
 	boardRedraw(&b);
 						/* 0,	  0	*/
-	boardSquareRedraw(&b, RANK_8, FILE_A);
+	boardSquareRedraw(&b, RANK_8, FILE_A, SQUARE_PLAIN);
 						/* 7,	  0 */
-	boardSquareRedraw(&b, RANK_1, FILE_A);
-	boardSquareRedraw(&b, RANK_1, FILE_F);
-	boardSquareRedraw(&b, RANK_4, FILE_C);
+	boardSquareRedraw(&b, RANK_1, FILE_A, SQUARE_PLAIN);
+	boardSquareRedraw(&b, RANK_1, FILE_F, SQUARE_PLAIN);
+	boardSquareRedraw(&b, RANK_4, FILE_C, SQUARE_SELECTED);
 
 	SDL_RenderPresent(ren);
 
@@ -258,7 +263,8 @@ main (int argc, char *argv[])
 	return 0;
 }
 
-void chessPieceRender(Board *b, Piece pc, Rank r, File f)
+void 
+chessPieceRender(Board *b, Piece pc, Rank r, File f)
 {
 	static SDL_Texture *txttex;
 	int iW, iH, x, y;
@@ -266,7 +272,7 @@ void chessPieceRender(Board *b, Piece pc, Rank r, File f)
 	/* could be handled more elegantly if PieceColor was a struct */
 	SDL_Color *pieceColor;
 
-	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at r %d f %d %c%c", 
+	SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at r %d f %d %c%c", 
 	    pc.name, r, f, rankToChar(r), fileToChar(f));
 
 	if (pc.color == PIECE_COLOR_WHITE)
@@ -285,7 +291,8 @@ void chessPieceRender(Board *b, Piece pc, Rank r, File f)
 
 }
 
-bool chessPieceToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color, 
+bool 
+chessPieceToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color, 
     int fontsize)
 {
 	SDL_Surface *surf;
@@ -316,7 +323,8 @@ bool chessPieceToTex(const char *msg, SDL_Texture **fonttex, SDL_Color color,
 	return true;
 }
 
-void renderTex(SDL_Texture *tex, int x, int y)
+void 
+renderTex(SDL_Texture *tex, int x, int y)
 {
 	SDL_Rect dst;
 	dst.x = x;
@@ -325,7 +333,8 @@ void renderTex(SDL_Texture *tex, int x, int y)
 	SDL_RenderCopy(ren, tex, NULL, &dst);
 }
 
-static void LogRendererInfo(SDL_RendererInfo rendererInfo) 
+static void 
+LogRendererInfo(SDL_RendererInfo rendererInfo) 
 { 
 	SDL_LogInfo(SDL_LOG_CATEGORY_VIDEO,
 	    "renderer: %s software=%d accelerated=%d presentvsync=%d targettexture=%d\n", 
@@ -372,7 +381,7 @@ piecePlaceOnBoard(Board *b, const Piece *p, Rank r, File f)
 	uint8_t bIdx;
 	bIdx = pieceRankFileToBoardPos(r,f);
 
-	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Placing piece %s r %d f %d at board array idx %d",
+	SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Placing piece %s r %d f %d at board array idx %d",
 		p->name, r, f, bIdx);
 
 	b->pos[bIdx] = p;
@@ -389,7 +398,6 @@ boardInit(Board *b)
 		return false;
 	}
 
-											/* raw values: rank 0, file 0 (array 0) */
 	piecePlaceOnBoard(b, &pieceBlackRook, RANK_8, FILE_A);
 	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_B); 
 	piecePlaceOnBoard(b, &pieceBlackBishop, RANK_8, FILE_C);
@@ -478,7 +486,7 @@ boardRedraw(Board *b)
 }
 
 void
-boardSquareRedraw(Board *b, Rank r, File f)
+boardSquareRedraw(Board *b, Rank r, File f, SquareState s)
 {
 	SDL_Rect sqRect;
 
@@ -486,28 +494,29 @@ boardSquareRedraw(Board *b, Rank r, File f)
 
 	bIdx = pieceRankFileToBoardPos(r, f);
 
-
-	if (bIdx%2)
+	if (s == SQUARE_SELECTED)
+		SDL_SetRenderDrawColor(ren, selectedBg.r, selectedBg.g, selectedBg.b, selectedBg.a);
+	else if (bIdx%2)
 		SDL_SetRenderDrawColor(ren, b->bgColor.r, b->bgColor.g, b->bgColor.b, b->bgColor.a);
 	else
 		SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
-
 
 	sqRect.w = b->squareLen;
 	sqRect.h = b->squareLen;
 	sqRect.x = (f * sqRect.w) + b->area.x;
 	sqRect.y = (r * sqRect.h) + b->area.y;
 
-	SDL_RenderFillRect(ren, &sqRect);
-
-	if (b->pos[bIdx] != NULL) {
-		chessPieceRender(b, *(b->pos[bIdx]), r, f);
-		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Redrawing square %s at r %d f %d (%c%c) (bIdx %d)", 
+	if (b->pos[bIdx] != NULL)
+		SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Redrawing square %s at r %d f %d (%c%c) (bIdx %d)", 
 	        b->pos[bIdx]->name, r, f, rankToChar(r), fileToChar(f), bIdx);
-	} else
-		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Redrawing empty square at r %d f %d (%c%c) (bIdx %d)", 
+	else
+		SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Redrawing empty square at r %d f %d (%c%c) (bIdx %d)", 
 	        r, f, rankToChar(r), fileToChar(f), bIdx);
 
+	SDL_RenderFillRect(ren, &sqRect);
+
+	if (b->pos[bIdx] != NULL)
+		chessPieceRender(b, *(b->pos[bIdx]), r, f);
 }
 
 /* inspired by one of the examples distributed with SDL */
