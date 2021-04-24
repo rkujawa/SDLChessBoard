@@ -180,24 +180,26 @@ bool
 controllerInit()
 {
 	int maxJoys;
-	int controllerIdx;
 	int joyIdx;
+	const char* name;
 
-	controllerIdx = 0;
 	maxJoys = SDL_NumJoysticks();
+	SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "controllerInit: we have %d joysticks\n", maxJoys);
 
 	for(joyIdx = 0; joyIdx < maxJoys; ++joyIdx) {
-		if (!SDL_IsGameController(joyIdx)) 
-			continue;
-		if (controllerIdx >= 1)
-			break;
-
-		gamepad = SDL_GameControllerOpen(joyIdx);
-		controllerIdx++;
+		if (!SDL_IsGameController(joyIdx)) {
+			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "controllerInit: not a GameControler at idx %d", joyIdx);
+		} else {
+			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "controllerInit: GameController at idx %d", joyIdx);
+			gamepad = SDL_GameControllerOpen(joyIdx);
+			name = SDL_GameControllerNameForIndex(joyIdx);
+		}
 	}
 
-	if (gamepad)
+	if (gamepad) {
+		SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "controllerInit: %s", name);
 		return true;
+	}
 
 	return false;
 }
@@ -213,6 +215,8 @@ main(int argc, char *argv[])
 	}
 
 	SDL_LogSetAllPriority(SDL_LOG_PRIORITY_DEBUG);
+
+	controllerInit();
 
 	fontPath = getDefaultFont();
 	if (fontPath == NULL) {
@@ -265,27 +269,35 @@ main(int argc, char *argv[])
 
 	SDL_RenderPresent(ren);
 
+	bool end;
+	SDL_Event e;
 
-	while (1) {
-		SDL_Event e;
+	end = false;
 
-		if (SDL_PollEvent(&e)) {
+	while (!end && SDL_WaitEvent(&e)) {
 
-			if (e.type == SDL_QUIT)
+		switch (e.type) {
+
+			case SDL_QUIT:
+				end = true;
 				break;
 
-			if (e.type == SDL_KEYDOWN) { 
+			case SDL_KEYDOWN:
 				if (e.key.keysym.sym == SDLK_ESCAPE)
-					break;
+					end = true;
+				break;
 
-				//SDL_RenderClear(ren);
-				//kfcRenderChar('b');
+			case SDL_CONTROLLERBUTTONDOWN:
+				//if (e.cbutton.button == SDL_CONTROLLER_BUTTON_X)
+					end = true;
+				break;
 
-			
-			}
+			default:
+				break;
 		}
 		//SDL_RenderPresent(ren);
 	}
+
 
 	TTF_Quit();	
 	SDL_DestroyRenderer(ren);
