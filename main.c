@@ -26,7 +26,8 @@
 #define SCREEN_WIDTH 1000
 #define SCREEN_HEIGHT 800
 
-#define CHESSBOARD_SQUARES 64
+#define CHESSBOARD_SQUARES		64		/* chess board has 64 squares */
+#define CHESSBOARD_SQ_LENGTH	8		/* chess board is 8 squares length */
 
 enum Rank { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 enum File { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
@@ -396,31 +397,31 @@ LogRendererInfo(SDL_RendererInfo rendererInfo)
 static inline uint8_t
 pieceRankFileToBoardPos(Rank r, File f)
 {
-	return r*8 + f;
+	return r * CHESSBOARD_SQ_LENGTH + f;
 }
 
 static inline Rank
 pieceBoardPosToRank(uint8_t bp)
 {
-	return bp/8;
+	return bp / CHESSBOARD_SQ_LENGTH;
 }
 
 static inline File
 pieceBoardPosToFile(uint8_t bp)
 {
-	return bp%8;
+	return bp % CHESSBOARD_SQ_LENGTH;
 }
 
 static inline char
 rankToChar(Rank r)
 {
-	return '0'+(8-r);
+	return '0' + (CHESSBOARD_SQ_LENGTH - r);
 }
 
 static inline char
 fileToChar(File f)
 {
-	return 'a'+f;
+	return 'a' + f;
 }
 
 static void
@@ -455,7 +456,7 @@ boardInit(Board *b)
 	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_G);
 	piecePlaceOnBoard(b, &pieceBlackRook, RANK_8, FILE_H);
 
-	for (i = 0; i < 8; i++)
+	for (i = 0; i < CHESSBOARD_SQ_LENGTH; i++)
 		piecePlaceOnBoard(b, &pieceBlackPawn, RANK_7, FILE_A+i);
 
 
@@ -468,7 +469,7 @@ boardInit(Board *b)
 	piecePlaceOnBoard(b, &pieceWhiteKnight, RANK_1, FILE_G);
 	piecePlaceOnBoard(b, &pieceWhiteRook, RANK_1, FILE_H);
 
-	for (i = 0; i < 8; i++)
+	for (i = 0; i < CHESSBOARD_SQ_LENGTH; i++)
 		piecePlaceOnBoard(b, &pieceWhitePawn, RANK_2, FILE_A+i);
 
 	return true;
@@ -503,7 +504,7 @@ boardSetupGraphics(Board *b)
 	b->area.w = boardPxLen;
 	b->area.h = boardPxLen;
 
-	b->squareLen = b->area.w/8;	/* again, we assume that w=h */
+	b->squareLen = b->area.w / CHESSBOARD_SQ_LENGTH;	/* again, we assume that w=h */
 
 }
 
@@ -579,7 +580,7 @@ boardRedrawEmpty(Board *b)
 	sqRect.h = b->squareLen;
 
 	/* draw squares in foreground color */
-	for( ; row < 8; row++) {
+	for( ; row < CHESSBOARD_SQ_LENGTH; row++) {
 		column = row%2;
 		x = column;
 		for( ; column < 4+(row%2); column++) {
