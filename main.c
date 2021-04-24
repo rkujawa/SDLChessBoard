@@ -53,8 +53,8 @@ typedef struct Piece {
 typedef struct Board {
 
 	SDL_Rect area;			/* board dimensions and position on the screen */
-	SDL_Color fgColor;
-	SDL_Color bgColor;
+	const SDL_Color *fgColor;
+	const SDL_Color *bgColor;
 
 	uint16_t squareLen;		/* length of square cell of the board */
 
@@ -72,16 +72,22 @@ void boardRedraw(Board *);
 void boardSetupGraphics(Board *);
 bool boardInit(Board *);
 void boardSquareRedraw(Board *, Rank, File, SquareState s);
+bool controllerInit();
 
 static inline char rankToChar(Rank);
 static inline char fileToChar(File);
 
-static SDL_Color white = { 255, 255, 255, 0 };
-static SDL_Color black = { 0, 0, 0, 0 };
-static SDL_Color selectedBg = { 57, 182, 191, 0 };
+
+static const SDL_Color white = { 255, 255, 255, 0 };
+static const SDL_Color black = { 0, 0, 0, 0 };
+static const SDL_Color selectedBg = { 57, 182, 191, 0 };
+static const SDL_Color bgColor = { 179, 122, 43, 0 };
+static const SDL_Color fgColor = { 219, 148, 48, 0 };
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
+
+static SDL_GameController *gamepad = NULL;
 
 static char *fontPath = NULL;
 
@@ -168,6 +174,32 @@ getDefaultFont()
 #else
 	return "chess_merida_unicode.ttf"; /* expected to be found in current directory */
 #endif /* _WITH_FONTCONFIG */
+}
+
+bool
+controllerInit()
+{
+	int maxJoys;
+	int controllerIdx;
+	int joyIdx;
+
+	controllerIdx = 0;
+	maxJoys = SDL_NumJoysticks();
+
+	for(joyIdx = 0; joyIdx < maxJoys; ++joyIdx) {
+		if (!SDL_IsGameController(joyIdx)) 
+			continue;
+		if (controllerIdx >= 1)
+			break;
+
+		gamepad = SDL_GameControllerOpen(joyIdx);
+		controllerIdx++;
+	}
+
+	if (gamepad)
+		return true;
+
+	return false;
 }
 
 int
@@ -258,6 +290,10 @@ main(int argc, char *argv[])
 	TTF_Quit();	
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
+
+	if (gamepad)
+		SDL_GameControllerClose(gamepad);
+
 	SDL_Quit();
 
 	return 0;
@@ -270,7 +306,7 @@ chessPieceRender(Board *b, Piece pc, Rank r, File f)
 	int iW, iH, x, y;
 
 	/* could be handled more elegantly if PieceColor was a struct */
-	SDL_Color *pieceColor;
+	const SDL_Color *pieceColor;
 
 	SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Rendering %s at r %d f %d %c%c", 
 	    pc.name, r, f, rankToChar(r), fileToChar(f));
@@ -433,11 +469,8 @@ boardSetupGraphics(Board *b)
 
 	uint16_t boardPxLen;		/* length of the board in pixels */
 
-	SDL_Color bgColor = { 179, 122, 43, 0 };
-	SDL_Color fgColor = { 219, 148, 48, 0 };
-
-	b->bgColor = bgColor;
-	b->fgColor = fgColor;
+	b->bgColor = &bgColor;
+	b->fgColor = &fgColor;
 
 	/* obtain size of our screen/window */
 	SDL_RenderGetViewport(ren, &screenArea);
@@ -497,9 +530,9 @@ boardSquareRedraw(Board *b, Rank r, File f, SquareState s)
 	if (s == SQUARE_SELECTED)
 		SDL_SetRenderDrawColor(ren, selectedBg.r, selectedBg.g, selectedBg.b, selectedBg.a);
 	else if (bIdx%2)
-		SDL_SetRenderDrawColor(ren, b->bgColor.r, b->bgColor.g, b->bgColor.b, b->bgColor.a);
+		SDL_SetRenderDrawColor(ren, b->bgColor->r, b->bgColor->g, b->bgColor->b, b->bgColor->a);
 	else
-		SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
+		SDL_SetRenderDrawColor(ren, b->fgColor->r, b->fgColor->g, b->fgColor->b, b->fgColor->a);
 
 	sqRect.w = b->squareLen;
 	sqRect.h = b->squareLen;
@@ -527,7 +560,7 @@ boardRedrawEmpty(Board *b)
 	SDL_Rect sqRect;
 
 	/* draw background */
-	SDL_SetRenderDrawColor(ren, b->bgColor.r, b->bgColor.g, b->bgColor.b, b->bgColor.a);
+	SDL_SetRenderDrawColor(ren, b->bgColor->r, b->bgColor->g, b->bgColor->b, b->bgColor->a);
 	SDL_RenderFillRect(ren, &(b->area));
 
 	sqRect.w = b->squareLen;
@@ -538,7 +571,7 @@ boardRedrawEmpty(Board *b)
 		column = row%2;
 		x = column;
 		for( ; column < 4+(row%2); column++) {
-			SDL_SetRenderDrawColor(ren, b->fgColor.r, b->fgColor.g, b->fgColor.b, b->fgColor.a);
+			SDL_SetRenderDrawColor(ren, b->fgColor->r, b->fgColor->g, b->fgColor->b, b->fgColor->a);
 			sqRect.x = (x * sqRect.w) + b->area.x;
 			sqRect.y = (row * sqRect.h) + b->area.y;
 			x += 2;
