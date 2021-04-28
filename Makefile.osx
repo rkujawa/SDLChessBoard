@@ -3,7 +3,7 @@ CC=cc
 SDL_CFLAGS = $(shell sdl2-config --cflags)
 SDL_LDFLAGS = $(shell sdl2-config --libs) -lSDL2_ttf 
 
-CFLAGS=-Wall -I/opt/local/include $(SDL_CFLAGS)
+CFLAGS=-Wall -g -I/opt/local/include $(SDL_CFLAGS)
 LDFLAGS = -lgc $(SDL_LDFLAGS)
 
 all: chessboard
