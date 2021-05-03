@@ -29,11 +29,14 @@
 #define CHESSBOARD_SQUARES		64		/* chess board has 64 squares */
 #define CHESSBOARD_SQ_LENGTH	8		/* chess board is 8 squares length */
 
+enum InputDirection { INPUT_UP, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT };
+
 enum Rank { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 enum File { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
 typedef enum Rank Rank;
 typedef enum File File;
+typedef enum InputDirection InputDirection;
 
 typedef bool PieceColor;
 #define PIECE_COLOR_WHITE true
@@ -81,10 +84,14 @@ void boardSetupGraphics(Board *);
 bool boardInit(Board *);
 void boardSquareRedraw(Board *, Rank, File);
 bool controllerInit();
+void chessInput(Board *, InputDirection);
+
 
 static inline char rankToChar(Rank);
 static inline char fileToChar(File);
 
+static inline Rank boardPosToRank(uint8_t);
+static inline File boardPosToFile(uint8_t);
 
 static const SDL_Color white = { 255, 255, 255, 0 };
 static const SDL_Color black = { 0, 0, 0, 0 };
@@ -297,14 +304,33 @@ main(int argc, char *argv[])
 			case SDL_KEYDOWN:
 				if (e.key.keysym.sym == SDLK_ESCAPE)
 					end = true;
+				
+				if (e.key.keysym.sym == SDLK_DOWN)
+					chessInput(&b, INPUT_DOWN);
+				if (e.key.keysym.sym == SDLK_UP)
+					chessInput(&b, INPUT_UP);
+				if (e.key.keysym.sym == SDLK_LEFT)
+					chessInput(&b, INPUT_LEFT);
+				if (e.key.keysym.sym == SDLK_RIGHT)
+					chessInput(&b, INPUT_RIGHT);
+
 				break;
 
 			case SDL_CONTROLLERBUTTONDOWN:
-				//if (e.cbutton.button == SDL_CONTROLLER_BUTTON_X)
-					end = true;
+				if (e.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN)
+					chessInput(&b, INPUT_DOWN);
+				if (e.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP)
+					chessInput(&b, INPUT_UP);
+				if (e.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_LEFT)
+					chessInput(&b, INPUT_LEFT);
+				if (e.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT)
+					chessInput(&b, INPUT_RIGHT);
+
+
 				break;
 
 			default:
+				/*SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Got unsupported event type %d", e.type);*/
 				break;
 		}
 		//SDL_RenderPresent(ren);
@@ -321,6 +347,61 @@ main(int argc, char *argv[])
 	SDL_Quit();
 
 	return 0;
+}
+
+uint8_t
+chessGetSelectedSquare(Board *b)
+{
+	uint8_t i;
+
+	for (i = 0; i < CHESSBOARD_SQUARES; i++) 
+		if (b->pos[i]->isSquareSelected)
+			return i;
+
+	return 0;
+}
+
+void
+chessInput(Board *b, InputDirection d) 
+{
+	int newSelectedSquare;
+	uint8_t selectedSquare;
+	Rank or, nr;
+	File of, nf;
+
+	SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Processing input down event");
+
+	selectedSquare = chessGetSelectedSquare(b);
+	newSelectedSquare = 0;
+
+	if (d == INPUT_DOWN)
+		newSelectedSquare = selectedSquare + 8;
+	else if (d == INPUT_LEFT)
+		newSelectedSquare = selectedSquare - 1;
+	else if (d == INPUT_RIGHT)
+		newSelectedSquare = selectedSquare + 1;
+	else if (d == INPUT_UP)
+		newSelectedSquare = selectedSquare - 8;
+
+
+	if (newSelectedSquare < 0)
+		newSelectedSquare = 0;
+	else if (newSelectedSquare >= CHESSBOARD_SQUARES)
+		newSelectedSquare = CHESSBOARD_SQUARES - 1;
+
+	b->pos[selectedSquare]->isSquareSelected = false;
+	b->pos[newSelectedSquare]->isSquareSelected = true;
+
+	or = boardPosToRank(selectedSquare);
+	of = boardPosToFile(selectedSquare);
+	nr = boardPosToRank(newSelectedSquare);
+	nf = boardPosToFile(newSelectedSquare);
+
+	boardRedraw(b);
+	boardSquareRedraw(b, nr, nf);
+	SDL_RenderPresent(ren);
+
+
 }
 
 void 
@@ -406,19 +487,19 @@ LogRendererInfo(SDL_RendererInfo rendererInfo)
 } 
 
 static inline uint8_t
-pieceRankFileToBoardPos(Rank r, File f)
+rankFileToBoardPos(Rank r, File f)
 {
 	return r * CHESSBOARD_SQ_LENGTH + f;
 }
 
 static inline Rank
-pieceBoardPosToRank(uint8_t bp)
+boardPosToRank(uint8_t bp)
 {
 	return bp / CHESSBOARD_SQ_LENGTH;
 }
 
 static inline File
-pieceBoardPosToFile(uint8_t bp)
+boardPosToFile(uint8_t bp)
 {
 	return bp % CHESSBOARD_SQ_LENGTH;
 }
@@ -439,7 +520,7 @@ static void
 piecePlaceOnBoard(Board *b, const Piece *p, Rank r, File f)
 {
 	uint8_t bIdx;
-	bIdx = pieceRankFileToBoardPos(r,f);
+	bIdx = rankFileToBoardPos(r,f);
 
 	SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Placing piece %s r %d f %d at board array idx %d",
 		p->name, r, f, bIdx);
@@ -463,7 +544,7 @@ boardInit(Board *b)
 		return false;
 	}
 
-	b->selectedSquare = pieceRankFileToBoardPos(RANK_8, FILE_A);
+	//b->selectedSquare = pieceRankFileToBoardPos(RANK_8, FILE_A);
 
 	piecePlaceOnBoard(b, &pieceBlackRook, RANK_8, FILE_A);
 	piecePlaceOnBoard(b, &pieceBlackKnight, RANK_8, FILE_B); 
@@ -540,12 +621,13 @@ boardRedraw(Board *b)
 	/* Iterate over all squares of board and draw pieces where appropripate. */
 	for (i = 0; i < CHESSBOARD_SQUARES; i++) {
 		if (b->pos[i]->p != NULL) {
-			r = pieceBoardPosToRank(i);
-			f = pieceBoardPosToFile(i);
+			r = boardPosToRank(i);
+			f = boardPosToFile(i);
 
 			chessPieceRender(b, *(b->pos[i]->p), r, f, false);
 		}
 	}
+
 }
 
 void
@@ -554,7 +636,7 @@ boardSquareRedraw(Board *b, Rank r, File f)
 	SDL_Rect sqRect;
 	uint8_t bIdx;
 
-	bIdx = pieceRankFileToBoardPos(r, f);
+	bIdx = rankFileToBoardPos(r, f);
 
 	if (b->pos[bIdx]->isSquareSelected)
 		SDL_SetRenderDrawColor(ren, selectedBg.r, selectedBg.g, selectedBg.b, selectedBg.a);
@@ -579,6 +661,7 @@ boardSquareRedraw(Board *b, Rank r, File f)
 
 	if (b->pos[bIdx]->p != NULL)
 		chessPieceRender(b, *(b->pos[bIdx]->p), r, f, b->pos[bIdx]->isPieceSelected);
+
 }
 
 /* inspired by one of the examples distributed with SDL */
